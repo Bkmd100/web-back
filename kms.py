@@ -11,7 +11,7 @@ import hashlib
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
 
-app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///DB.db'
+app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///databases/DB.db'
 db=SQLAlchemy(app)
 
 def hash(hash_string):
