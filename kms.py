@@ -25,7 +25,12 @@ class User(db.Model):
 	username=db.Column(db.String(25), nullable=False, unique=True)
 	password=db.Column(db.String(25), nullable=False)
 	email=db.Column(db.String(25), nullable=False, unique=True)
-	image=db.Column(db.String(25), nullable=False,  default="dafault.jpg")
+	profile_picture=db.Column(db.String(25), nullable=False,  default="dafault_p.jpg")
+	icon = db.Column(db.String(25), nullable=False, default="dafault_i.jpg")
+	cover = db.Column(db.String(25), nullable=False, default="dafault_c.jpg")
+	
+	
+	
 	posts=db.relationship("Post",backref="author",lazy=True)
 	comments=db.relationship("Comment", backref="author", lazy=True)
 	likes=db.relationship("Like", backref="author", lazy=True)
@@ -38,7 +43,6 @@ class Post(db.Model):
 
 	post_id=db.Column(db.Integer, primary_key=True, autoincrement=True,unique=True)
 	user_id=db.Column(db.Integer,db.ForeignKey("user.user_id"), nullable=False)
-	title=db.Column(db.String(25), nullable=False )
 	date_posted=db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 	content=db.Column(db.Text, nullable=False)
 	image=db.Column(db.Text )
@@ -99,7 +103,7 @@ def get_user():
 
 		"username":user.username,
 		"email":user.email,
-		"image":user.image,
+		"profile_picture":user.profile_picture,
 
 
 			}
@@ -113,6 +117,9 @@ def get_user():
 
 
 
+
+
+
 @app.route('/api/get/followers', methods=['GET'])
 def get_followers():
 	comments=[]
@@ -120,8 +127,10 @@ def get_followers():
 		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
 		for follower in user.followers:
 			mini={
-				"user_id": follower.follower_id,
-
+				"user_id": follower.follower.user_id,
+				"icon":follower.follower.icon,
+				"follow_id":follower.follow_id,
+				"username_id":follower.follower.username,
 				}
 			comments.append(mini)
 	return jsonify(comments)
@@ -163,7 +172,6 @@ def get_posts():
 		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
 		for post in user.posts:
 			mini={
-				"title": post.title,
 				"date_posted": post.date_posted,
 				"content": post.content,
 				"image":post.image,
@@ -177,56 +185,81 @@ def get_posts():
 @app.route('/api/get/profile', methods=['GET'])
 def get_profile():
 
-	posts=[]
+	f_posts=[]
 	if ("user_id") in request.args:
 		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
-		for post in user.posts:
-			mini={
-				"title": post.title,
-				"date_posted": post.date_posted,
-				"content": post.content,
-				"image":post.image,
-				"post_id":post.post_id,
+		posts=user.posts
+
+		for post in posts:
+			comments = post.comments
+			comments_filter = []
+			mini = {}
+			for comment in comments:
+				mini = {
+					"commentor_username": comment.author.username,
+					"content": comment.content,
+					"date": comment.date_posted,
+					"commenter_icon": comment.author.icon
 
 				}
-			posts.append(mini)
+				comments_filter.append(mini)
+			mini = {
+				"comments": comments_filter,
+				"date_posted": post.date_posted,
+				"content": post.content,
+				"image": post.image,
+				"poster_icon": user.icon,
+				"post_id": post.post_id,
+				"poster_username": user.username,
+				"n_likes": len(post.likes)
+			}
+			f_posts.append(mini)
+	return jsonify(f_posts)
 
-		reply = {
 
-			"username": user.username,
-			"n_followers":len(user.followers),
-			"n_following": len(user.following),
-			"image": user.image,
-			"posts":posts
-
-		}
-	return jsonify(reply)
 
 
 @app.route('/api/get/home', methods=['GET'])
-def get_home():
-	posts={}
-	if ("user_id") in request.args:
-
-		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
+def get_home(user_id=None):
+	posts=[]
+	if ("user_id") in request.args or not(user_id is None) :
+		if (user_id is None):
+			user_id=request.args["user_id"]
+		user=User.query.filter_by(user_id=user_id).first()
 		followings=user.following
 		for following in followings:
 			f_posts=following.followed.posts
-			f_posts_filtered=[]
 			for post in f_posts:
+				comments=post.comments
+				comments_filter=[]
+				mini={}
+				for comment in comments:
+
+
+
+
+					mini={
+						"commentor_username":comment.author.username,
+						"content":comment.content,
+						"date":comment.date_posted,
+						"commenter_icon":comment.author.icon
+
+
+					}
+					comments_filter.append(mini)
 				mini = {
-					"title": post.title,
+					"comments":comments_filter,
 					"date_posted": post.date_posted,
 					"content": post.content,
 					"image": post.image,
+					"poster_icon": following.followed.icon,
 					"post_id": post.post_id,
-
+					"poster_username":following.followed.username,
+					"n_likes":len(post.likes)
 				}
-				f_posts_filtered.append(mini)
+				posts.append(mini)
 
-			posts[following.followed.user_id]=(f_posts_filtered)
 
-	print(posts)
 	return jsonify(posts)
 
 
@@ -243,18 +276,25 @@ def reset():
 	User(username="python", password=hash("python"), email="ppp@69.com"),
 	User(username="fag", password=hash("python"), email="nyes@669.com"),
 	User(username="sean", password=hash("python"), email="ssss@669.com"),
-	Post(user_id=1, title="hmm", content="hi"),
-	Post(user_id=2, title="hmm2", content="hi2"),
-	Post(user_id=2, title="post3", content="hi2"),
-	Post(user_id=2, title="post4", content="hi2"),
-	Post(user_id=2, title="post1", content="hi2"),
-	Post(user_id=3, title="hmm2dfr", content="hi2"),
-	Post(user_id=3, title="hmm2de102", content="hi2"),
-	Post(user_id=3, title="hffffmm2", content="hi2"),
-	Post(user_id=3, title="hmm2", content="hi2"),
+	Post(user_id=1,  content="hi"),
+	Post(user_id=2,  content="hi2"),
+	Post(user_id=2,  content="hi2"),
+	Post(user_id=2, content="hi2"),
+	Post(user_id=2, content="hi2"),
+	Post(user_id=3,  content="hi2"),
+	Post(user_id=3,content="hi2"),
+	Post(user_id=3,content="hi2"),
+	Post(user_id=3,  content="hi2"),
 
 	Comment(content="hhh",user_id=1,post_id=1),
+	Comment(content="hhh",user_id=1,post_id=5),
+	Comment(content="hhh2", user_id=3, post_id=5),
 	Like(user_id=2,post_id=1),
+	Like(user_id=2,post_id=5),
+	Like(user_id=1,post_id=3),
+	Like(user_id=2,post_id=3),
+
+
 	Follow(follower_id=1, followed_id=2),
 	Follow(follower_id=1, followed_id=3),
 	Follow(follower_id=2,followed_id=3)
@@ -382,16 +422,16 @@ def add_user():
 		"error":"username or email or password not found"
 		})
 
-@app.route('/api/change/image', methods=['GET'])
-def change_image():
-	if ("user_id","image") in request.args:
+@app.route('/api/change/profile_picture', methods=['GET'])
+def change_profile_picture():
+	if ("user_id","profile_picture") in request.args:
 		user=User.query.filter_by(user_id=request.args["user_id"]).first()
 		if not(user):
 			return jsonify({
 				"success": False,
 				"error": "user not found"
 				})
-		user.image=request.args["image"]
+		user.profile_picture=request.args["profile_picture"]
 
 
 		return jsonify({
@@ -410,18 +450,32 @@ def change_image():
 @app.route('/api/authentication', methods=['GET'])
 def api_all():
 	reply={
-		"error":True,
+		"error":"bad request",
 		"success":False,
-		"id":None
 		}
-	if ("password" and "username") in request.args:
+	if "password" in request.args and "username" in request.args:
+		reply["error"] = False
+		username=request.args["username"]
+		password=request.args["password"]
 
-		reply["error"]=False
-		id=login(request.args["username"],hash(request.args["password"]))
+		user = User.query.filter_by(username=username, password=hash(password)).first()
 
-		if bool(id):
-			reply["id"]=id
+
+
+		if user:
 			reply["success"]=True
+			reply["id"]=user.user_id
+			reply["success"]=True
+			reply["profile_picture"]=user.profile_picture
+			reply["icon"]=user.icon
+			reply["username"]=user.username
+
+			reply["cover"]=user.cover
+			reply.pop("error")
+		else:
+			reply["error"]="bad login"
+
+
 
 
 
