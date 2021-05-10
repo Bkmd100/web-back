@@ -29,8 +29,8 @@ class User(db.Model):
 	posts=db.relationship("Post",backref="author",lazy=True)
 	comments=db.relationship("Comment", backref="author", lazy=True)
 	likes=db.relationship("Like", backref="author", lazy=True)
-	followers=db.relationship("Follow", lazy=True,primaryjoin="Follow.followed_id== User.user_id")
-	following=db.relationship("Follow",  lazy=True,primaryjoin = "Follow.follower_id == User.user_id")
+	followers=db.relationship("Follow", lazy=True,primaryjoin="Follow.followed_id== User.user_id", backref="followed")
+	following=db.relationship("Follow",  lazy=True,primaryjoin = "Follow.follower_id == User.user_id",backref="follower")
 
 
 
@@ -167,10 +167,71 @@ def get_posts():
 				"date_posted": post.date_posted,
 				"content": post.content,
 				"image":post.image,
-				"post_id":post.post_id
+				"post_id":post.post_id,
+
 				}
 			posts.append(mini)
 	return jsonify(posts)
+
+
+@app.route('/api/get/profile', methods=['GET'])
+def get_profile():
+
+	posts=[]
+	if ("user_id") in request.args:
+		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
+		for post in user.posts:
+			mini={
+				"title": post.title,
+				"date_posted": post.date_posted,
+				"content": post.content,
+				"image":post.image,
+				"post_id":post.post_id,
+
+				}
+			posts.append(mini)
+
+		reply = {
+
+			"username": user.username,
+			"n_followers":len(user.followers),
+			"n_following": len(user.following),
+			"image": user.image,
+			"posts":posts
+
+		}
+	return jsonify(reply)
+
+
+@app.route('/api/get/home', methods=['GET'])
+def get_home():
+	posts={}
+	if ("user_id") in request.args:
+
+		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
+		followings=user.following
+		for following in followings:
+			f_posts=following.followed.posts
+			f_posts_filtered=[]
+			for post in f_posts:
+				mini = {
+					"title": post.title,
+					"date_posted": post.date_posted,
+					"content": post.content,
+					"image": post.image,
+					"post_id": post.post_id,
+
+				}
+				f_posts_filtered.append(mini)
+
+			posts[following.followed.user_id]=(f_posts_filtered)
+
+	print(posts)
+	return jsonify(posts)
+
+
+
+
 
 
 @app.route('/api/reset', methods=['GET'])
@@ -184,6 +245,13 @@ def reset():
 	User(username="sean", password=hash("python"), email="ssss@669.com"),
 	Post(user_id=1, title="hmm", content="hi"),
 	Post(user_id=2, title="hmm2", content="hi2"),
+	Post(user_id=2, title="post3", content="hi2"),
+	Post(user_id=2, title="post4", content="hi2"),
+	Post(user_id=2, title="post1", content="hi2"),
+	Post(user_id=3, title="hmm2dfr", content="hi2"),
+	Post(user_id=3, title="hmm2de102", content="hi2"),
+	Post(user_id=3, title="hffffmm2", content="hi2"),
+	Post(user_id=3, title="hmm2", content="hi2"),
 
 	Comment(content="hhh",user_id=1,post_id=1),
 	Like(user_id=2,post_id=1),
@@ -359,3 +427,4 @@ def api_all():
 
 	return jsonify(reply)
 
+app.run()
