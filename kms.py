@@ -1,22 +1,52 @@
 from datetime import datetime
 import flask
-import json
+import uuid
 # import bder as bd
 from flask import request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import hashlib
+from flask_cors import CORS
 
 
 
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
+app.config['CORS_HEADERS'] = 'Content-Type'
 
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///databases/DB.db'
+CORS(app)
+
+
+
 db=SQLAlchemy(app)
 
-def hash(hash_string):
-    sha_signature = hashlib.sha256(hash_string.encode()).hexdigest()
-    return sha_signature
+password_salt="n69@@yes"
+secret_salt="bruh_wtf@@@6969"
+
+
+(bad_secret)= ({
+				"success": False,
+				"error": "bad secret"
+			})
+(missing_args)=({
+				"success": False,
+				"error": "misisng arguments"
+			})
+not_found= ({
+				"success": False,
+				"error": "not found"
+			})
+
+
+def hash(hash_string,is_password=True):
+	if is_password:
+		salt=password_salt
+	else:
+		salt=secret_salt
+	hash_string_salted=hash_string+salt
+	sha_signature = hashlib.sha256(hash_string_salted.encode()).hexdigest()
+	return sha_signature
 
 
 class User(db.Model):
@@ -28,8 +58,8 @@ class User(db.Model):
 	profile_picture=db.Column(db.String(25), nullable=False,  default="dafault_p.jpg")
 	icon = db.Column(db.String(25), nullable=False, default="dafault_i.jpg")
 	cover = db.Column(db.String(25), nullable=False, default="dafault_c.jpg")
-	
-	
+	secret_user= db.Column(db.String(50))
+	secret_hash  = db.Column(db.String(50))
 	
 	posts=db.relationship("Post",backref="author",lazy=True)
 	comments=db.relationship("Comment", backref="author", lazy=True)
@@ -86,17 +116,26 @@ def login(username,password):
 	else:
 		return False
 
+def check_secret(secret_user,secret_hash,id=False):
+	user=User.query.filter_by(secret_user=secret_user, secret_hash=secret_hash).first()
+	if not user:
+
+		return False
+	if id:
+		return user.user_id
+	return user
+
+
 
 @app.route('/api/get/user', methods=['GET'])
 def get_user():
-
-	if ("user_id") in request.args:
+	requirements=["secret_user","secret_hash","user_id"]
+	if all( r in request.args  for r in requirements):
+		if not check_secret(	request.args["secret_user"],	request.args["secret_hash"]):
+			return jsonify(bad_secret)
 		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
 		if not(user):
-			return jsonify({
-				"success": False,
-				"error": "user not found"
-				})
+			return jsonify(not_found)
 
 
 		mini={
@@ -110,10 +149,7 @@ def get_user():
 
 		return jsonify(mini)
 
-	return jsonify({
-		"success":False,
-		"error":"user_id not found"
-		})
+	return jsonify(missing_args)
 
 
 
@@ -123,71 +159,111 @@ def get_user():
 @app.route('/api/get/followers', methods=['GET'])
 def get_followers():
 	comments=[]
-	if ("user_id") in request.args:
+	requirements = ["secret_user", "secret_hash", "user_id"]
+	if all(r in request.args for r in requirements):
+		if not check_secret(request.args["secret_user"], request.args["secret_hash"]):
+			return jsonify(bad_secret)
 		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
-		for follower in user.followers:
-			mini={
-				"user_id": follower.follower.user_id,
-				"icon":follower.follower.icon,
-				"follow_id":follower.follow_id,
-				"username_id":follower.follower.username,
-				}
-			comments.append(mini)
-	return jsonify(comments)
+		if user:
+			for follower in user.followers:
+				mini={
+					"user_id": follower.follower.user_id,
+					"icon":follower.follower.icon,
+					"follow_id":follower.follow_id,
+					"username":follower.follower.username,
+					}
+				comments.append(mini)
+		else:
+			return jsonify(not_found)
+		return jsonify(comments)
 
+	else:
+		return jsonify(missing_args)
 
 @app.route('/api/get/following', methods=['GET'])
 def get_following():
 	comments=[]
-	if ("user_id") in request.args:
+	requirements = ["secret_user", "secret_hash", "user_id"]
+	if all(r in request.args for r in requirements):
+		if not check_secret(request.args["secret_user"], request.args["secret_hash"]):
+			return jsonify(bad_secret)
 		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
-		for follower in user.following:
-			mini={
-				"user_id": follower.followed_id,
+		if user:
+			for follower in user.following:
+				mini={
 
-				}
-			comments.append(mini)
-	return jsonify(comments)
+					"user_id": follower.followed.user_id,
+					"icon": follower.followed.icon,
+					"follow_id": follower.follow_id,
+					"username": follower.followed.username,
+					}
+				comments.append(mini)
+			return jsonify(comments)
+		else:
+			return jsonify(not_found)
+	else:
+		return jsonify(missing_args)
+
 
 
 @app.route('/api/get/comments', methods=['GET'])
 def get_comments():
 	comments=[]
-	if ("post_id") in request.args:
-		posts=Post.query.filter_by(user_id=	request.args["post_id"]).first()
-		for comment in posts.comments:
-			mini={
-				"comment_id": comment.comment_id,
-				"date_posted": comment.date_posted,
-				"content" : comment.content,
-				"user_id": comment.user_id
-				}
-			comments.append(mini)
-	return jsonify(comments)
+	requirements = ["secret_user", "secret_hash", "post_id"]
+	if all(r in request.args for r in requirements):
+		if not check_secret(request.args["secret_user"], request.args["secret_hash"]):
+			return jsonify(bad_secret)
+		posts=Post.query.filter_by(post_id=	request.args["post_id"]).first()
+		if posts:
+			for comment in posts.comments:
+				mini={
+					"comment_id": comment.comment_id,
+					"date_posted": comment.date_posted,
+					"content" : comment.content,
+					"user_id": comment.user_id
+					}
+				comments.append(mini)
+			return jsonify(comments)
+		else:
+			return jsonify(not_found)
+	else:
+		return jsonify(missing_args)
 
 @app.route('/api/get/posts', methods=['GET'])
 def get_posts():
 	posts=[]
-	if ("user_id") in request.args:
+	requirements = ["secret_user", "secret_hash", "user_id"]
+	if all(r in request.args for r in requirements):
+		if not check_secret(request.args["secret_user"], request.args["secret_hash"]):
+			return jsonify(bad_secret)
 		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
-		for post in user.posts:
-			mini={
-				"date_posted": post.date_posted,
-				"content": post.content,
-				"image":post.image,
-				"post_id":post.post_id,
+		if user:
+			for post in user.posts:
+				mini={
+					"date_posted": post.date_posted,
+					"content": post.content,
+					"image":post.image,
+					"post_id":post.post_id,
 
-				}
-			posts.append(mini)
-	return jsonify(posts)
+					}
+				posts.append(mini)
+			return jsonify(posts)
+		else:
+			return jsonify(not_found)
+	else:
+		return jsonify(missing_args)
 
 
 @app.route('/api/get/profile', methods=['GET'])
 def get_profile():
-
+	print(len(request.args))
 	f_posts=[]
-	if ("user_id") in request.args:
-		user=User.query.filter_by(user_id=	request.args["user_id"]).first()
+	requirements = ["secret_user", "secret_hash"]
+	if all(r in request.args for r in requirements):
+		user=check_secret(request.args["secret_user"], request.args["secret_hash"])
+		if not user:
+			return jsonify(bad_secret)
+
 		posts=user.posts
 
 		for post in posts:
@@ -195,37 +271,47 @@ def get_profile():
 			comments_filter = []
 			mini = {}
 			for comment in comments:
-				mini = {
-					"commentor_username": comment.author.username,
-					"content": comment.content,
-					"date": comment.date_posted,
-					"commenter_icon": comment.author.icon
-
-				}
+				# mini = {
+				# 	"commentor_username": comment.author.username,
+				# 	"content": comment.content,
+				# 	"date": comment.date_posted,
+				# 	"commenter_icon": comment.author.icon
+				#
+				# }
+				mini = [comment.author.username, comment.content, comment.date_posted, comment.author.icon]
 				comments_filter.append(mini)
 			mini = {
 				"comments": comments_filter,
-				"date_posted": post.date_posted,
-				"content": post.content,
-				"image": post.image,
-				"poster_icon": user.icon,
-				"post_id": post.post_id,
-				"poster_username": user.username,
-				"n_likes": len(post.likes)
+				"postDate": post.date_posted,
+				"postText": post.content,
+				# "postImgURL": post.image,
+				"postImgURL": "/assets/images/resources/user-post6.jppg",
+
+				# "userIconURL": following.followed.icon,
+				"userIconURL": "/assets/images/resources/admin.jpg",
+				"postID": post.post_id,
+				"userName": user.username,
+				"likesCount": len(post.likes),
+				"liked": bool(Like.query.filter_by(user_id=user.user_id, post_id=post.post_id).first())
 			}
 			f_posts.append(mini)
-	return jsonify(f_posts)
+		return jsonify(f_posts)
+
+	else:
+		return jsonify(missing_args)
 
 
 
 
 @app.route('/api/get/home', methods=['GET'])
-def get_home(user_id=None):
-	posts=[]
-	if ("user_id") in request.args or not(user_id is None) :
-		if (user_id is None):
-			user_id=request.args["user_id"]
-		user=User.query.filter_by(user_id=user_id).first()
+def get_home():
+
+	requirements = ["secret_user", "secret_hash"]
+	if all(r in request.args for r in requirements):
+		user = check_secret(request.args["secret_user"], request.args["secret_hash"])
+		if not bool(user):
+			return jsonify(bad_secret)
+		posts=[]
 		followings=user.following
 		for following in followings:
 			f_posts=following.followed.posts
@@ -238,29 +324,33 @@ def get_home(user_id=None):
 
 
 
-					mini={
-						"commentor_username":comment.author.username,
-						"content":comment.content,
-						"date":comment.date_posted,
-						"commenter_icon":comment.author.icon
-
-
-					}
+					# mini={
+					# 	"commentor_username":comment.author.username,
+					# 	"content":comment.content,
+					# 	"date":comment.date_posted,
+					# 	"commenter_icon":comment.author.icon
+					#
+					#
+					# }
+					mini=[comment.author.username,comment.content,comment.date_posted,comment.author.icon]
 					comments_filter.append(mini)
 				mini = {
 					"comments":comments_filter,
-					"date_posted": post.date_posted,
-					"content": post.content,
-					"image": post.image,
-					"poster_icon": following.followed.icon,
-					"post_id": post.post_id,
-					"poster_username":following.followed.username,
-					"n_likes":len(post.likes)
+					"postDate": post.date_posted,
+					"postText": post.content,
+					# "postImgURL": post.image,
+					   "postImgURL":"/assets/images/resources/user-post6.jppg",
+									
+					# "userIconURL": following.followed.icon,
+					"userIconURL": "/assets/images/resources/admin.jpg",
+					"postID": post.post_id,
+					"userName":following.followed.username,
+					"likesCount":len(post.likes),
+					"liked": bool(Like.query.filter_by(user_id=user.user_id,post_id=post.post_id).first())
 				}
 				posts.append(mini)
 
-
-	return jsonify(posts)
+		return jsonify(posts)
 
 
 
@@ -276,28 +366,28 @@ def reset():
 	User(username="python", password=hash("python"), email="ppp@69.com"),
 	User(username="fag", password=hash("python"), email="nyes@669.com"),
 	User(username="sean", password=hash("python"), email="ssss@669.com"),
-	Post(user_id=1,  content="hi"),
-	Post(user_id=2,  content="hi2"),
-	Post(user_id=2,  content="hi2"),
-	Post(user_id=2, content="hi2"),
-	Post(user_id=2, content="hi2"),
-	Post(user_id=3,  content="hi2"),
-	Post(user_id=3,content="hi2"),
-	Post(user_id=3,content="hi2"),
-	Post(user_id=3,  content="hi2"),
+	Post(user_id=1,  content="by user 1 post1"),
+	Post(user_id=2,  content="by user 2 post1"),
+	Post(user_id=2,  content="by user 2 post2"),
+	Post(user_id=2, content="by user 2 post3"),
+	Post(user_id=2, content="by user 2 post4"),
+	Post(user_id=3,  content="by user 3 post1"),
+	Post(user_id=3,content="by user 3 post2"),
+	Post(user_id=3,content="by user 3 post3"),
+	Post(user_id=3,  content="hby user 3 post4"),
 
-	Comment(content="hhh",user_id=1,post_id=1),
-	Comment(content="hhh",user_id=1,post_id=5),
-	Comment(content="hhh2", user_id=3, post_id=5),
+	Comment(content="by user 1 on post 1",user_id=1,post_id=1),
+	Comment(content="by user 1 on post 2",user_id=1,post_id=5),
+	Comment(content="hhhby user 3 on post 5", user_id=3, post_id=5),
 	Like(user_id=2,post_id=1),
 	Like(user_id=2,post_id=5),
 	Like(user_id=1,post_id=3),
 	Like(user_id=2,post_id=3),
-
+	Like(user_id=3, post_id=1),
 
 	Follow(follower_id=1, followed_id=2),
 	Follow(follower_id=1, followed_id=3),
-	Follow(follower_id=2,followed_id=3)
+	Follow(follower_id=2,followed_id=1)
 
 
 		]
@@ -309,31 +399,51 @@ def reset():
 
 	return jsonify({"success":True})
 
-@app.route('/api/add/like', methods=['GET'])
+@app.route('/api/add/like', methods=['GET']) #here!!!
 def add_like():
-	if ("user_id" and "post_id") in request.args:
-		if (Like.query.filter_by(user_id=request.args["user_id"],post_id=request.args["post_id"]).first()):
+	requirements = ["secret_user", "secret_hash", "post_id"]
+	if all(r in request.args for r in requirements):
+		user_id=check_secret(request.args["secret_user"], request.args["secret_hash"],True)
+		print(user_id)
+		if not user_id:
+			return jsonify(bad_secret)
+		post=Post.query.filter_by(post_id=request.args["post_id"]).first()
+		if not(post):
+			return jsonify({
+				"success": False,
+				"error": "post  not found"
+			})
+		followed_id=post.author.user_id
+		if not(followed_id==user_id or Follow.query.filter_by(follower_id=user_id, followed_id=followed_id).first()):
+			return jsonify({
+				"success": False,
+				"error": "follow them first"
+			})
+
+		if (Like.query.filter_by(user_id=user_id,post_id=request.args["post_id"]).first()):
 			return jsonify({
 				"success": False,
 				"error": "like already exists"
 				})
 
-		like=Like(user_id=request.args["user_id"],post_id=request.args["post_id"])
+		like=Like(user_id=user_id,post_id=request.args["post_id"])
 		db.session.add(like)
 		db.session.commit()
 
 		return jsonify({
 						   "success": True
 						   })
-	return jsonify({
-		"success": False,
-		"error":"user_id or post_id not found"
-		})
+	return jsonify(missing_args)
 
 @app.route('/api/remove/like', methods=['GET'])
 def remove_like():
-	if ("like_id") in request.args:
-		like=Like.query.filter_by(like_id=	request.args["like_id"]).first()
+	requirements = ["secret_user", "secret_hash", "post_id"]
+	if all(r in request.args for r in requirements):
+		user_id = check_secret(request.args["secret_user"], request.args["secret_hash"], True)
+		print(user_id)
+		if not user_id:
+			return jsonify(bad_secret)
+		like=Like.query.filter_by(post_id=	request.args["post_id"],user_id=user_id).first()
 		if not like:
 			return jsonify({
 				"success": False,
@@ -346,37 +456,58 @@ def remove_like():
 					   "success": True
 					   })
 
-	return jsonify({
-		"success": False,
-		"error": "like_id not found"
-		})
+
+	else:
+		return jsonify(missing_args)
 
 
 @app.route('/api/add/follow', methods=['GET'])
 def add_follow():
-	if ("follower_id" and "followed_id") in request.args:
-		if (Follow.query.filter_by(follower_id=request.args["follower_id"],followed_id=request.args["followed_id"]).first()):
+	requirements = ["secret_user", "secret_hash", "followed_id"]
+
+	if all(r in request.args for r in requirements):
+		user_id = check_secret(request.args["secret_user"], request.args["secret_hash"], True)
+		if not user_id:
+			return jsonify(bad_secret)
+		print(type(user_id))
+		print(type(request.args["followed_id"]))
+		if  (str(user_id)==request.args["followed_id"]):
+			return jsonify({
+				"success": False,
+				"error": "you can't follow yourself"
+			})
+
+		if not (User.query.filter_by(user_id=request.args["followed_id"]).first()):
+			return jsonify({
+				"success": False,
+				"error": "user not found"
+			})
+
+		if (Follow.query.filter_by(follower_id=user_id,followed_id=request.args["followed_id"]).first()):
 			return jsonify({
 				"success": False,
 				"error": "follow already exists"
 				})
 
-		follow=Follow(follower_id=request.args["follower_id"],followed_id=request.args["followed_id"])
+		follow=Follow(follower_id=user_id,followed_id=request.args["followed_id"])
 		db.session.add(follow)
 		db.session.commit()
 
 		return jsonify({
 						   "success": True
 						   })
-	return jsonify({
-		"success": False,
-		"error":"follower_id or followed_id not found"
-		})
+	else:
+		return jsonify(missing_args)
 
 @app.route('/api/remove/follow', methods=['GET'])
 def remove_follow():
-	if ("follow_id") in request.args:
-		follow=Follow.query.filter_by(follow_id=request.args["follow_id"]).first()
+	requirements = ["secret_user", "secret_hash", "followed_id"]
+
+	if all(r in request.args for r in requirements):
+		user_id = check_secret(request.args["secret_user"], request.args["secret_hash"], True)
+		if not user_id:
+			return jsonify(bad_secret)
+		follow=Follow.query.filter_by(followed_id=request.args["followed_id"],follower_id=user_id).first()
 		if not follow:
 			return jsonify({
 				"success": False,
@@ -389,11 +520,7 @@ def remove_follow():
 					   "success": True
 					   })
 
-	return jsonify({
-		"success": False,
-		"error": "follow_id not found"
-		})
-
+	return jsonify(missing_args)
 
 @app.route('/api/add/user', methods=['GET'])
 def add_user():
@@ -424,6 +551,7 @@ def add_user():
 
 @app.route('/api/change/profile_picture', methods=['GET'])
 def change_profile_picture():
+
 	if ("user_id","profile_picture") in request.args:
 		user=User.query.filter_by(user_id=request.args["user_id"]).first()
 		if not(user):
@@ -463,13 +591,20 @@ def api_all():
 
 
 		if user:
+			secret_user=str(uuid.uuid4())
+			secret_hash=hash(str(uuid.uuid4()),False)
+			user.secret_user=secret_user
+			user.secret_hash = secret_hash
+			db.session.commit()
+
 			reply["success"]=True
 			reply["id"]=user.user_id
 			reply["success"]=True
 			reply["profile_picture"]=user.profile_picture
 			reply["icon"]=user.icon
 			reply["username"]=user.username
-
+			reply["secret_user"] = secret_user
+			reply["secret_hash"] = secret_hash
 			reply["cover"]=user.cover
 			reply.pop("error")
 		else:
@@ -478,7 +613,9 @@ def api_all():
 
 
 
-
+	print(reply)
 	return jsonify(reply)
 
-app.run()
+
+# app.run()
+app.run(host='0.0.0.0', port='5000',threaded=True)
