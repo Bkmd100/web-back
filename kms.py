@@ -256,7 +256,7 @@ def get_posts():
 
 @app.route('/api/get/profile', methods=['GET'])
 def get_profile():
-	print(len(request.args))
+
 	f_posts=[]
 	requirements = ["secret_user", "secret_hash"]
 	if all(r in request.args for r in requirements):
@@ -404,7 +404,7 @@ def add_like():
 	requirements = ["secret_user", "secret_hash", "post_id"]
 	if all(r in request.args for r in requirements):
 		user_id=check_secret(request.args["secret_user"], request.args["secret_hash"],True)
-		print(user_id)
+
 		if not user_id:
 			return jsonify(bad_secret)
 		post=Post.query.filter_by(post_id=request.args["post_id"]).first()
@@ -440,7 +440,7 @@ def remove_like():
 	requirements = ["secret_user", "secret_hash", "post_id"]
 	if all(r in request.args for r in requirements):
 		user_id = check_secret(request.args["secret_user"], request.args["secret_hash"], True)
-		print(user_id)
+
 		if not user_id:
 			return jsonify(bad_secret)
 		like=Like.query.filter_by(post_id=	request.args["post_id"],user_id=user_id).first()
@@ -461,6 +461,10 @@ def remove_like():
 		return jsonify(missing_args)
 
 
+
+
+
+
 @app.route('/api/add/follow', methods=['GET'])
 def add_follow():
 	requirements = ["secret_user", "secret_hash", "followed_id"]
@@ -469,8 +473,7 @@ def add_follow():
 		user_id = check_secret(request.args["secret_user"], request.args["secret_hash"], True)
 		if not user_id:
 			return jsonify(bad_secret)
-		print(type(user_id))
-		print(type(request.args["followed_id"]))
+
 		if  (str(user_id)==request.args["followed_id"]):
 			return jsonify({
 				"success": False,
@@ -522,6 +525,93 @@ def remove_follow():
 
 	return jsonify(missing_args)
 
+
+@app.route('/api/add/post', methods=['GET'])
+def add_post():
+	requirements = ["secret_user", "secret_hash", "content"]
+
+	if all(r in request.args for r in requirements):
+		user_id = check_secret(request.args["secret_user"], request.args["secret_hash"], True)
+		if not user_id:
+			return jsonify(bad_secret)
+
+
+
+		if "picture" in request.args:
+			picture=request.args["picture"]
+		else:
+			picture=None
+
+		post=Post(user_id=user_id,content=request.args["content"],picture=picture)
+		db.session.add(post)
+		db.session.commit()
+
+		return jsonify({
+						   "success": True
+						   })
+	else:
+		return jsonify(missing_args)
+
+
+
+@app.route('/api/add/comment', methods=['GET']) #here!!!
+def add_comment():
+	requirements = ["secret_user", "secret_hash", "post_id","content"]
+	if all(r in request.args for r in requirements):
+		user_id=check_secret(request.args["secret_user"], request.args["secret_hash"],True)
+
+		if not user_id:
+			return jsonify(bad_secret)
+		post=Post.query.filter_by(post_id=request.args["post_id"]).first()
+		if not(post):
+			return jsonify({
+				"success": False,
+				"error": "post  not found"
+			})
+		followed_id=post.author.user_id
+		if not(followed_id==user_id or Follow.query.filter_by(follower_id=user_id, followed_id=followed_id).first()):
+			return jsonify({
+				"success": False,
+				"error": "follow them first"
+			})
+
+
+
+		comment=Comment(user_id=user_id,post_id=request.args["post_id"],content=request.args["content"])
+		db.session.add(comment)
+		db.session.commit()
+
+		return jsonify({
+						   "success": True
+						   })
+	return jsonify(missing_args)
+
+@app.route('/api/remove/comment', methods=['GET'])
+def remove_comment():
+	requirements = ["secret_user", "secret_hash", "comment_id"]
+	if all(r in request.args for r in requirements):
+		user_id = check_secret(request.args["secret_user"], request.args["secret_hash"], True)
+
+		if not user_id:
+			return jsonify(bad_secret)
+		comment=Comment.query.filter_by(comment_id=	request.args["comment_id"]).first()
+		if not comment:
+			return jsonify({
+				"success": False,
+				"error": "like does not exist"
+				})
+		db.session.delete(comment)
+		db.session.commit()
+
+		return jsonify({
+					   "success": True
+					   })
+
+
+	else:
+		return jsonify(missing_args)
+
+
 @app.route('/api/add/user', methods=['GET'])
 def add_user():
 	if ("username" and "email" and "password" ) in request.args:
@@ -544,31 +634,42 @@ def add_user():
 		return jsonify({
 						   "success": True
 						   })
-	return jsonify({
-		"success": False,
-		"error":"username or email or password not found"
-		})
+	return jsonify(missing_args)
 
 @app.route('/api/change/profile_picture', methods=['GET'])
 def change_profile_picture():
+	requirements = ["secret_user", "secret_hash", "profile_picture"]
+	if all(r in request.args for r in requirements):
+		user = check_secret(request.args["secret_user"], request.args["secret_hash"])
+		if not user:
+			return jsonify(bad_secret)
 
-	if ("user_id","profile_picture") in request.args:
-		user=User.query.filter_by(user_id=request.args["user_id"]).first()
-		if not(user):
-			return jsonify({
-				"success": False,
-				"error": "user not found"
-				})
-		user.profile_picture=request.args["profile_picture"]
+		user.profile_picture="/assets/profiles_pictures/"+request.args["profile_picture"]
+		user.icon="/assets/icons/"+request.args["profile_picture"]
 
+		db.session.commit()
 
 		return jsonify({
 						   "success": True
 						   })
-	return jsonify({
-		"success": False,
-		"error":"user_id not found"
-		})
+	return jsonify(missing_args)
+
+
+@app.route('/api/change/cover', methods=['GET'])
+def change_profile_cover():
+	requirements = ["secret_user", "secret_hash", "cover"]
+	if all(r in request.args for r in requirements):
+		user = check_secret(request.args["secret_user"], request.args["secret_hash"])
+		if not user:
+			return jsonify(bad_secret)
+
+		user.cover=request.args["cover"]
+		db.session.commit()
+
+		return jsonify({
+						   "success": True
+						   })
+	return jsonify(missing_args)
 
 
 
@@ -613,7 +714,7 @@ def api_all():
 
 
 
-	print(reply)
+
 	return jsonify(reply)
 
 
