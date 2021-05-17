@@ -1,22 +1,29 @@
 from datetime import datetime
 import flask
 import uuid
-# import bder as bd
 from flask import request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import hashlib
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
+import os
+
 
 
 
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
 app.config['CORS_HEADERS'] = 'Content-Type'
-
+app.config['UPLOAD_FOLDER'] = "/tmp/web/assets/"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///databases/DB.db'
 CORS(app)
 
+ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
+
+
+def allowed_file(filename):
+	return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 db=SQLAlchemy(app)
@@ -103,7 +110,6 @@ class Follow(db.Model):
 
 	follower_id=db.Column(db.Integer, db.ForeignKey("user.user_id"), nullable=False)
 	followed_id=db.Column(db.Integer, db.ForeignKey("user.user_id"), nullable=False)
-
 
 
 
@@ -324,14 +330,6 @@ def get_home():
 
 
 
-					# mini={
-					# 	"commentor_username":comment.author.username,
-					# 	"content":comment.content,
-					# 	"date":comment.date_posted,
-					# 	"commenter_icon":comment.author.icon
-					#
-					#
-					# }
 					mini=[comment.author.username,comment.content,comment.date_posted,comment.author.icon]
 					comments_filter.append(mini)
 				mini = {
@@ -363,7 +361,7 @@ def reset():
 	db.create_all()
 
 	ex=[
-	User(username="python", password=hash("python"), email="ppp@69.com"),
+	User(username="python", password=hash("python"), email="ppp@69.com",profile_picture="assets/images/resources/user-avatar.jpg",cover="assets/images/resources/timeline-1.jpg",icon="/assets/images/resources/nearly1.jpg'"),
 	User(username="fag", password=hash("python"), email="nyes@669.com"),
 	User(username="sean", password=hash("python"), email="ssss@669.com"),
 	Post(user_id=1,  content="by user 1 post1"),
@@ -398,6 +396,8 @@ def reset():
 	db.session.commit()
 
 	return jsonify({"success":True})
+
+
 
 @app.route('/api/add/like', methods=['GET']) #here!!!
 def add_like():
@@ -526,28 +526,35 @@ def remove_follow():
 	return jsonify(missing_args)
 
 
-@app.route('/api/add/post', methods=['GET'])
+@app.route('/api/add/post', methods=['POST'])
 def add_post():
-	requirements = ["secret_user", "secret_hash", "content"]
+	requirements = ["secret_user", "secret_hash","text"]
 
-	if all(r in request.args for r in requirements):
-		user_id = check_secret(request.args["secret_user"], request.args["secret_hash"], True)
+	if all(r in request.form  for r in requirements):
+		user_id = check_secret(request.form["secret_user"], request.form["secret_hash"], True)
 		if not user_id:
 			return jsonify(bad_secret)
+		path=None
+
+		if 'picture' in request.files:
+
+			file = request.files['picture']
+			if file and file.filename != ''   and  allowed_file(file.filename):
+
+				filename = secure_filename(file.filename)
+				path = os.path.join(app.config['UPLOAD_FOLDER'] + "posts/", filename)
+				file.save(path)
 
 
 
-		if "picture" in request.args:
-			picture=request.args["picture"]
-		else:
-			picture=None
-
-		post=Post(user_id=user_id,content=request.args["content"],picture=picture)
+		post=Post(user_id=user_id,content=request.form["text"],image=path)
 		db.session.add(post)
 		db.session.commit()
 
 		return jsonify({
-						   "success": True
+						   "success": True,
+							"postID":post.post_id,
+							"postImgURL":path
 						   })
 	else:
 		return jsonify(missing_args)
@@ -636,41 +643,66 @@ def add_user():
 						   })
 	return jsonify(missing_args)
 
-@app.route('/api/change/profile_picture', methods=['GET'])
+@app.route('/api/change/profile_picture', methods=['POST'])
 def change_profile_picture():
-	requirements = ["secret_user", "secret_hash", "profile_picture"]
-	if all(r in request.args for r in requirements):
-		user = check_secret(request.args["secret_user"], request.args["secret_hash"])
+	requirements = ["secret_user", "secret_hash"]
+	if all(r in request.form for r in requirements):
+		user = check_secret(request.form["secret_user"], request.form["secret_hash"])
 		if not user:
 			return jsonify(bad_secret)
 
-		user.profile_picture="/assets/profiles_pictures/"+request.args["profile_picture"]
-		user.icon="/assets/icons/"+request.args["profile_picture"]
 
-		db.session.commit()
+		if 'profile_picture' not in request.files:
+			return jsonify(missing_args)
+		file = request.files['profile_picture']
+		if file.filename == '':
+			return jsonify(missing_args)
+		if file and allowed_file(file.filename):
+			filename = secure_filename(file.filename)
+			path=os.path.join(app.config['UPLOAD_FOLDER'] + "profiles_pictures/", filename)
+			file.save(path)
 
-		return jsonify({
-						   "success": True
-						   })
+			user.profile_picture=path
+			user.icon=user.profile_picture
+
+			db.session.commit()
+
+			return jsonify({
+							   "success": True,
+					"porfile_picture": path,
+				"icon":path
+							   })
 	return jsonify(missing_args)
 
 
-@app.route('/api/change/cover', methods=['GET'])
-def change_profile_cover():
-	requirements = ["secret_user", "secret_hash", "cover"]
-	if all(r in request.args for r in requirements):
-		user = check_secret(request.args["secret_user"], request.args["secret_hash"])
+@app.route('/api/change/cover', methods=['POST'])
+def change_cover():
+	requirements = ["secret_user", "secret_hash"]
+	if all(r in request.form for r in requirements):
+		user = check_secret(request.form["secret_user"], request.form["secret_hash"])
 		if not user:
 			return jsonify(bad_secret)
 
-		user.cover=request.args["cover"]
-		db.session.commit()
+		if 'cover' not in request.files:
+			return jsonify(missing_args)
+		file = request.files['cover']
+		if file.filename == '':
+			return jsonify(missing_args)
+		if file and allowed_file(file.filename):
+			filename = secure_filename(file.filename)
+			path=os.path.join(app.config['UPLOAD_FOLDER'] + "covers/", filename)
+			file.save(path)
 
-		return jsonify({
-						   "success": True
-						   })
+			user.cover = path
+
+
+			db.session.commit()
+
+			return jsonify({
+				"success": True,
+				"cover":path
+			})
 	return jsonify(missing_args)
-
 
 
 
@@ -694,6 +726,10 @@ def api_all():
 		if user:
 			secret_user=str(uuid.uuid4())
 			secret_hash=hash(str(uuid.uuid4()),False)
+
+			secret_user = "a"
+			secret_hash = "a"
+
 			user.secret_user=secret_user
 			user.secret_hash = secret_hash
 			db.session.commit()
@@ -719,4 +755,4 @@ def api_all():
 
 
 # app.run()
-app.run(host='0.0.0.0', port='5000',threaded=True)
+app.run(host='0.0.0.0', port=5000,threaded=True)
