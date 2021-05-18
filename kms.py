@@ -9,6 +9,7 @@ from werkzeug.utils import secure_filename
 import os
 
 
+
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
 app.config['CORS_HEADERS'] = 'Content-Type'
