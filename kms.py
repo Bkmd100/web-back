@@ -126,7 +126,7 @@ def check_secret(secret_user, secret_hash, id=False):
         return user.user_id
     return user
 
-
+# app routing
 @app.route('/api/get/user', methods=['GET'])
 def get_user():
     requirements = ["secret_user", "secret_hash", "user_id"]
