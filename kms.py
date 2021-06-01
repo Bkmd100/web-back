@@ -9,7 +9,6 @@ from werkzeug.utils import secure_filename
 import os
 
 
-
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
 app.config['CORS_HEADERS'] = 'Content-Type'
@@ -43,7 +42,7 @@ not_found = ({
     "error": "not found"
 })
 
-
+# to hash the passwords
 def hash(hash_string, is_password=True):
     if is_password:
         salt = password_salt
@@ -53,7 +52,7 @@ def hash(hash_string, is_password=True):
     sha_signature = hashlib.sha256(hash_string_salted.encode()).hexdigest()
     return sha_signature
 
-
+# the main user class
 class User(db.Model):
     user_id = db.Column(db.Integer, primary_key=True, autoincrement=True, unique=True)
     username = db.Column(db.String(25), nullable=False, unique=True)
@@ -73,7 +72,7 @@ class User(db.Model):
     following = db.relationship("Follow", lazy=True, primaryjoin="Follow.follower_id == User.user_id",
                                 backref="follower")
 
-
+# the post that the user creates
 class Post(db.Model):
     post_id = db.Column(db.Integer, primary_key=True, autoincrement=True, unique=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.user_id"), nullable=False)
@@ -84,7 +83,7 @@ class Post(db.Model):
     comments = db.relationship("Comment", backref="master", lazy=True)
     likes = db.relationship("Like", backref="master", lazy=True)
 
-
+# when a user comments a post
 class Comment(db.Model):
     comment_id = db.Column(db.Integer, primary_key=True, autoincrement=True, unique=True)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -92,7 +91,7 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.user_id"), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey("post.post_id"), nullable=False)
 
-
+# the likes part 
 class Like(db.Model):
     like_id = db.Column(db.Integer, primary_key=True, autoincrement=True, unique=True)
 
