@@ -100,7 +100,7 @@ class Like(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.user_id"), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey("post.post_id"), nullable=False)
 
-
+# following another user
 class Follow(db.Model):
     follow_id = db.Column(db.Integer, primary_key=True, autoincrement=True, unique=True)
 
@@ -109,7 +109,7 @@ class Follow(db.Model):
     follower_id = db.Column(db.Integer, db.ForeignKey("user.user_id"), nullable=False)
     followed_id = db.Column(db.Integer, db.ForeignKey("user.user_id"), nullable=False)
 
-
+# logging in
 def login(username, password):
     user = User.query.filter_by(username=username, password=password).first()
     if user:
@@ -117,7 +117,7 @@ def login(username, password):
     else:
         return False
 
-
+# auth part
 def check_secret(secret_user, secret_hash, id=False):
     user = User.query.filter_by(secret_user=secret_user, secret_hash=secret_hash).first()
     if not user:
@@ -561,7 +561,7 @@ def add_comment():
         })
     return jsonify(missing_args)
 
-
+# app routing 
 @app.route('/api/remove/comment', methods=['GET'])
 def remove_comment():
     requirements = ["secret_user", "secret_hash", "comment_id"]
