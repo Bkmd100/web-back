@@ -97,7 +97,7 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.user_id"), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey("post.post_id"), nullable=False)
 
-
+ 
 class Like(db.Model):
     like_id = db.Column(db.Integer, primary_key=True, autoincrement=True, unique=True)
 
@@ -106,7 +106,7 @@ class Like(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.user_id"), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey("post.post_id"), nullable=False)
 
-
+    
 class Follow(db.Model):
     follow_id = db.Column(db.Integer, primary_key=True, autoincrement=True, unique=True)
 
@@ -566,7 +566,7 @@ def add_comment():
         })
     return jsonify(missing_args)
 
-
+# app routing 
 @app.route('/api/remove/comment', methods=['GET'])
 def remove_comment():
     requirements = ["secret_user", "secret_hash", "comment_id"]
