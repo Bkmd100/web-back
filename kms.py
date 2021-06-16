@@ -1,3 +1,8 @@
+#coded by Med Achraf Belkahla
+#bkmd100@gmail.com
+#2021
+
+
 from datetime import datetime
 import flask
 import uuid
@@ -7,13 +12,13 @@ import hashlib
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os
+from PIL import Image
 
-
-
+debug=False
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
 app.config['CORS_HEADERS'] = 'Content-Type'
-app.config['UPLOAD_FOLDER'] = "/tmp/web/assets/"
+app.config['UPLOAD_FOLDER'] = "/home/SocialNetwork/src/assets/"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///databases/DB.db'
 CORS(app)
@@ -59,9 +64,9 @@ class User(db.Model):
     username = db.Column(db.String(25), nullable=False, unique=True)
     password = db.Column(db.String(25), nullable=False)
     email = db.Column(db.String(25), nullable=False, unique=True)
-    profile_picture = db.Column(db.String(25), nullable=False, default="dafault_p.jpg")
-    icon = db.Column(db.String(25), nullable=False, default="dafault_i.jpg")
-    cover = db.Column(db.String(25), nullable=False, default="dafault_c.jpg")
+    profile_picture = db.Column(db.String(25), nullable=False, default="/assets/profiles_pictures/defaultPP.jpg")
+    icon = db.Column(db.String(25), nullable=False, default="/assets/profiles_pictures/defaultIcon.jpg")
+    cover = db.Column(db.String(25), nullable=False, default="/assets/covers/defaultCover.png")
     secret_user = db.Column(db.String(50))
     secret_hash = db.Column(db.String(50))
 
@@ -153,7 +158,7 @@ def get_user():
 
 @app.route('/api/get/followers', methods=['GET'])
 def get_followers():
-    comments = []
+    followers_list = []
     requirements = ["secret_user", "secret_hash", "user_id"]
     if all(r in request.args for r in requirements):
         if not check_secret(request.args["secret_user"], request.args["secret_hash"]):
@@ -167,10 +172,10 @@ def get_followers():
                     "follow_id": follower.follow_id,
                     "username": follower.follower.username,
                 }
-                comments.append(mini)
+                followers_list.append(mini)
         else:
             return jsonify(not_found)
-        return jsonify(comments)
+        return jsonify(followers_list)
 
     else:
         return jsonify(missing_args)
@@ -266,24 +271,18 @@ def get_profile():
             comments_filter = []
             mini = {}
             for comment in comments:
-                # mini = {
-                # 	"commentor_username": comment.author.username,
-                # 	"content": comment.content,
-                # 	"date": comment.date_posted,
-                # 	"commenter_icon": comment.author.icon
-                #
-                # }
+
                 mini = [comment.author.username, comment.content, comment.date_posted, comment.author.icon]
                 comments_filter.append(mini)
             mini = {
                 "comments": comments_filter,
                 "postDate": post.date_posted,
                 "postText": post.content,
-                # "postImgURL": post.image,
-                "postImgURL": "/assets/images/resources/user-post6.jppg",
+                "postImgURL": post.image,
 
-                # "userIconURL": following.followed.icon,
-                "userIconURL": "/assets/images/resources/admin.jpg",
+
+                "userIconURL": user.icon,
+
                 "postID": post.post_id,
                 "userName": user.username,
                 "likesCount": len(post.likes),
@@ -318,11 +317,9 @@ def get_home():
                     "comments": comments_filter,
                     "postDate": post.date_posted,
                     "postText": post.content,
-                    # "postImgURL": post.image,
-                    "postImgURL": "/assets/images/resources/user-post6.jppg",
+                    "postImgURL": post.image,
 
-                    # "userIconURL": following.followed.icon,
-                    "userIconURL": "/assets/images/resources/admin.jpg",
+                    "userIconURL": following.followed.icon,
                     "postID": post.post_id,
                     "userName": following.followed.username,
                     "likesCount": len(post.likes),
@@ -339,24 +336,25 @@ def reset():
     db.create_all()
 
     ex = [
-        User(username="python", password=hash("python"), email="ppp@69.com",
-             profile_picture="assets/images/resources/user-avatar.jpg", cover="assets/images/resources/timeline-1.jpg",
-             icon="/assets/images/resources/nearly1.jpg'"),
-        User(username="fag", password=hash("python"), email="nyes@669.com"),
-        User(username="sean", password=hash("python"), email="ssss@669.com"),
-        Post(user_id=1, content="by user 1 post1"),
-        Post(user_id=2, content="by user 2 post1"),
-        Post(user_id=2, content="by user 2 post2"),
-        Post(user_id=2, content="by user 2 post3"),
-        Post(user_id=2, content="by user 2 post4"),
-        Post(user_id=3, content="by user 3 post1"),
-        Post(user_id=3, content="by user 3 post2"),
-        Post(user_id=3, content="by user 3 post3"),
-        Post(user_id=3, content="hby user 3 post4"),
+        User(username="python", password=hash("python"), email="pythonpython@yahoo.com",
+             profile_picture="/assets/profiles_pictures/python.jpeg", icon="/assets/profiles_pictures/python.ico",
+             cover="/assets/covers/python_cover.jpeg"),
 
-        Comment(content="by user 1 on post 1", user_id=1, post_id=1),
-        Comment(content="by user 1 on post 2", user_id=1, post_id=5),
-        Comment(content="hhhby user 3 on post 5", user_id=3, post_id=5),
+        User(username="sarah", password=hash("python"), email="sarahj6699@gmail.com",
+             profile_picture="/assets/profiles_pictures/sarah.jpeg",icon="/assets/profiles_pictures/sarah.ico",
+             cover="/assets/covers/sarah_cover.png"),
+        User(username="sean", password=hash("python"), email="seasntt@669.com",
+             profile_picture="/assets/profiles_pictures/sean.jpeg",icon="/assets/profiles_pictures/sean.ico",
+             cover="/assets/covers/sean_cover.jpeg"),
+        Post(user_id=1, content="I am having a bad day"),
+        Post(user_id=2, content="life is meaningless"),
+        Post(user_id=2, content="existence is pain"),
+        Post(user_id=3, content="life is coool"),
+        Post(user_id=3, content="who is free tonight"),
+
+        Comment(content="based", user_id=1, post_id=2),
+        Comment(content="me", user_id=1, post_id=5),
+        Comment(content="wtf whats wrong?", user_id=1, post_id=2),
         Like(user_id=2, post_id=1),
         Like(user_id=2, post_id=5),
         Like(user_id=1, post_id=3),
@@ -365,7 +363,8 @@ def reset():
 
         Follow(follower_id=1, followed_id=2),
         Follow(follower_id=1, followed_id=3),
-        Follow(follower_id=2, followed_id=1)
+        Follow(follower_id=2, followed_id=1),
+        Follow(follower_id=3, followed_id=2)
 
     ]
 
@@ -376,7 +375,7 @@ def reset():
     return jsonify({"success": True})
 
 
-@app.route('/api/add/like', methods=['GET'])  # here!!!
+@app.route('/api/add/like', methods=['GET'])
 def add_like():
     requirements = ["secret_user", "secret_hash", "post_id"]
     if all(r in request.args for r in requirements):
@@ -518,21 +517,26 @@ def add_post():
                 filename = secure_filename(file.filename)
                 path = os.path.join(app.config['UPLOAD_FOLDER'] + "posts/", filename)
                 file.save(path)
+            else:
+                return jsonify({
+                "success": False,
+                "error": "illegal file"
+            })
 
-        post = Post(user_id=user_id, content=request.form["text"], image=path)
+        post = Post(user_id=user_id, content=request.form["text"], image= "/assets/posts/"+filename )
         db.session.add(post)
         db.session.commit()
 
         return jsonify({
             "success": True,
             "postID": post.post_id,
-            "postImgURL": path
+            "postImgURL": "/assets/posts/"+filename
         })
     else:
         return jsonify(missing_args)
 
 
-@app.route('/api/add/comment', methods=['GET'])  # here!!!
+@app.route('/api/add/comment', methods=['GET'])
 def add_comment():
     requirements = ["secret_user", "secret_hash", "post_id", "content"]
     if all(r in request.args for r in requirements):
@@ -631,16 +635,18 @@ def change_profile_picture():
             filename = secure_filename(file.filename)
             path = os.path.join(app.config['UPLOAD_FOLDER'] + "profiles_pictures/", filename)
             file.save(path)
-
-            user.profile_picture = path
-            user.icon = user.profile_picture
+            icon=Image.open(path)
+            icon=icon.resize((45,45),Image.ANTIALIAS)
+            icon.save(path+"_icon.jpg",optimize=True,quality=95)
+            user.profile_picture = "/assets/profiles_pictures/"+filename
+            user.icon = "/assets/profiles_pictures/"+filename+"_icon.jpg"
 
             db.session.commit()
 
             return jsonify({
                 "success": True,
-                "porfile_picture": path,
-                "icon": path
+                "profile_picture": "/assets/profiles_pictures/"+filename,
+                "icon": "/assets/profiles_pictures/"+filename+"_icon.jpg"
             })
     return jsonify(missing_args)
 
@@ -663,13 +669,13 @@ def change_cover():
             path = os.path.join(app.config['UPLOAD_FOLDER'] + "covers/", filename)
             file.save(path)
 
-            user.cover = path
+            user.cover = "/assets/covers/"+filename
 
             db.session.commit()
 
             return jsonify({
                 "success": True,
-                "cover": path
+                "cover": "/assets/covers/"+filename
             })
     return jsonify(missing_args)
 
@@ -690,9 +696,10 @@ def api_all():
         if user:
             secret_user = str(uuid.uuid4())
             secret_hash = hash(str(uuid.uuid4()), False)
-
-            secret_user = "a"
-            secret_hash = "a"
+            if debug:
+                # secret_user = "a"
+                # secret_hash = "a"
+                pass
 
             user.secret_user = secret_user
             user.secret_hash = secret_hash
@@ -714,5 +721,5 @@ def api_all():
     return jsonify(reply)
 
 
-# app.run()
+
 app.run(host='0.0.0.0', port=5000, threaded=True)
